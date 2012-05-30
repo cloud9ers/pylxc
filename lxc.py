@@ -1,6 +1,9 @@
 import subprocess
 import logging
-import threading
+import threading, select
+import pty
+import os
+import signal
 
 
 class ContainerAlreadyExists(Exception): pass
@@ -8,9 +11,52 @@ class ContainerAlreadyRunning(Exception): pass
 class ContainerNotExists(Exception): pass
 
 
-logger = logging.getLogger("pylxc")
+_logger = logging.getLogger("pylxc")
+_monitor = None  
 
 
+class _LXCMonitor(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self._process = None
+        self._monitors = {}
+        
+    def run(self):
+        master, slave = pty.openpty()
+        cmd = ['lxc-monitor', '-n', '.*']
+        self._process = subprocess.Popen(cmd, stdout=slave, bufsize=1)
+        stdout = os.fdopen(master)
+        while self._process.poll() is None:
+            ready, _, _ = select.select([stdout], [], [], 0.1)
+            if ready:
+                logging.debug("Waiting for state change")
+                state = stdout.readline()
+                inf = state.strip().split()
+                container = inf[0].strip("'")
+                state = inf[-1].strip('[]')
+                if container in self._monitors:
+                    logging.debug("State of container '%s' changed to '%s'", container, state)
+                    self._monitors[container](state)
+        _logger.info("LXC Monitor stopped!")
+    
+    def add_monitor(self, name, callback):
+        self._monitors[name] = callback
+    
+    def rm_monitor(self, name):
+        self._monitors.pop(name)
+    
+    def is_monitored(self, name):
+        return name in self._monitors
+    
+    def kill(self):
+        try:
+            self._process.terminate()
+            self._process.wait()
+        except:
+            pass
+        self.join() 
+
+        
 def create(name, config_file=None, template=None, backing_store=None, template_options=None):
     '''
     Create a new container
@@ -35,10 +81,11 @@ def create(name, config_file=None, template=None, backing_store=None, template_o
             
     if subprocess.check_call(cmd) == 0:
         if not exists(name):
-            logger.critical("The Container %s doesn't seem to be created! (options: %s)", name, cmd[3:])
+            _logger.critical("The Container %s doesn't seem to be created! (options: %s)", name, cmd[3:])
             raise ContainerNotExists("The container (%s) does not exist!" % name)
 
-        logger.info("Container %s has been created with options %s", name, cmd[3:])
+        _logger.info("Container %s has been created with options %s", name, cmd[3:])
+
 
 def exists(name):
     '''
@@ -151,14 +198,48 @@ def destroy(name):
     subprocess.check_call(cmd)
 
 
-def monitor(name):
+def monitor(name, callback):
     '''
-    FIXME: Not Implemented
-    monitors actions on the specified container(s), name is passed as regex
+    monitors actions on the specified container,
+    callback is a function to be called on 
     '''
-    pass
+    global _monitor 
+    if not exists(name):
+        raise ContainerNotExists("The container (%s) does not exist!" % name)
+    if _monitor:
+        if _monitor.is_monitored(name):
+            raise Exception("You are already monitoring this container (%s)" % name)
+    else:
+        _monitor = _LXCMonitor()
+        logging.info("Starting LXC Monitor")
+        _monitor.start()
+        def kill_handler(sg, fr):
+            stop_monitor()
+        signal.signal(signal.SIGTERM, kill_handler)
+        signal.signal(signal.SIGINT, kill_handler)
+    _monitor.add_monitor(name, callback)
+            
+
+def unmonitor(name):
+    if not exists(name):
+        raise ContainerNotExists("The container (%s) does not exist!" % name)
+    if not _monitor:
+        raise Exception("LXC Monitor is not started!")
+    if not _monitor.is_monitored(name):
+        raise Exception("This container (%s) is not monitored!" % name)
+    _monitor.rm_monitor(name)
 
 
+def stop_monitor():
+    global _monitor
+    if _monitor:
+        logging.info("Killing LXC Monitor")
+        _monitor.kill()
+        _monitor = None
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+        
 def freeze(name):
     '''
     freezes the container
@@ -217,5 +298,5 @@ def notify(name, states, callback):
     def th():
         subprocess.check_call(cmd)
         callback()
-    logger.info("Waiting on states %s for container %s", states, name)
+    _logger.info("Waiting on states %s for container %s", states, name)
     threading.Thread(target=th).start()
