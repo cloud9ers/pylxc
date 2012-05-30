@@ -8,7 +8,7 @@ A simple python wrapper on LXC commands
 Usage
 =====
 You can query current containers using
-    
+   
     import lxc
     lxc.all_as_list()
     >> ['Container1', 'Container2', 'Container3']
@@ -26,7 +26,7 @@ to get the running or stopped list
     >> ['Container2', 'Container3']
 
 Check if a container exists
-   
+    
     import lxc
     lxc.exists("Container1")
 
