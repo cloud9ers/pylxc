@@ -15,7 +15,7 @@ setup(name='pylxc',
       packages=['lxc'],
       zip_safe=True,
       license = "LGPLv3",
-      classifiers = ['Development Status :: 5 - Production/Stable'
+      classifiers = ['Development Status :: 5 - Production/Stable',
                      'Intended Audience :: Developers',
                      'Intended Audience :: System Administrators',
                      'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
