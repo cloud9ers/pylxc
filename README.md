@@ -5,6 +5,11 @@ A simple python wrapper on LXC commands
 
 > Note: This currently wraps lxc-* command line, probably will be converted to wrap liblxc instead using Cython or Swig
 
+Installation
+============
+    
+    pip install pylxc
+
 Usage
 =====
 You can query current containers using
