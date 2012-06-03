@@ -194,7 +194,7 @@ def destroy(name):
     '''
     if not exists(name):
         raise ContainerNotExists("The container (%s) does not exist!" % name)
-    cmd = ['lxc-destory', '-f', '-n', name]
+    cmd = ['lxc-destroy', '-f', '-n', name]
     subprocess.check_call(cmd)
 
 
