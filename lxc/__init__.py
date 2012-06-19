@@ -159,6 +159,16 @@ def start(name, config_file=None):
     subprocess.check_call(cmd)
 
 
+def stop(name):
+    '''
+    stops a container
+    '''
+    if not exists(name):
+        raise ContainerNotExists("The container (%s) does not exist!" % name)
+    cmd = ['lxc-stop', '-n', name]
+    subprocess.check_call(cmd)
+    
+
 def kill(name, signal):
     '''
     sends a kill signal to process 1 of ths container <name>
