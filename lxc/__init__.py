@@ -133,6 +133,7 @@ def all_as_dict():
             continue
         if c == 'FROZEN':
             current = frozen
+            continue
         if not len(c):
             continue
         current.append(c)
