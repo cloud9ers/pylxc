@@ -121,6 +121,7 @@ def all_as_dict():
     out = subprocess.check_output(cmd).splitlines()
     stopped = []
     running = []
+    frozen = []
     current = None
     for c in out:
         c = c.strip()
@@ -130,11 +131,14 @@ def all_as_dict():
         if c == 'STOPPED':
             current = stopped
             continue
+        if c == 'FROZEN':
+            current = frozen
         if not len(c):
             continue
         current.append(c)
     return {'Running': running,
-            'Stopped': stopped}
+            'Stopped': stopped,
+            'Frozen': frozen}
          
 
 def all_as_list():
