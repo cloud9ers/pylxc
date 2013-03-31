@@ -68,23 +68,26 @@ def create(name, config_file=None, template=None, backing_store=None, template_o
     '''
     if exists(name):
         raise ContainerAlreadyExists("The Container %s is already created!" % name)
-    cmd = ['lxc-create', '-n', name]
+    cmd = 'lxc-create -n %s' % name
 
     if config_file:
-        cmd += ['-f', config_file]
+        cmd += ' -f %s' % config_file
     if template:
-        cmd += ['-t', template]
+        cmd += ' -t %s' % template
     if backing_store:
-        cmd += ['-B', backing_store]
+        cmd += ' -B %s' % backing_store
     if template_options:
-        cmd += ['--'] + template_options
-            
-    if subprocess.check_call(cmd) == 0:
+        cmd += '-- %s' % template_options
+
+    if subprocess.check_call('%s >> /dev/null' % cmd, shell=True) == 0:
         if not exists(name):
             _logger.critical("The Container %s doesn't seem to be created! (options: %s)", name, cmd[3:])
             raise ContainerNotExists("The container (%s) does not exist!" % name)
 
         _logger.info("Container %s has been created with options %s", name, cmd[3:])
+        return 0
+    else:
+        return 1
 
 
 def exists(name):
@@ -94,7 +97,6 @@ def exists(name):
     if name in all_as_list():
         return True
     return False
-
 
 def running():
     ''' 
@@ -140,14 +142,19 @@ def all_as_dict():
     return {'Running': running,
             'Stopped': stopped,
             'Frozen': frozen}
-         
+
 
 def all_as_list():
     '''
     returns a list of all defined containers
     '''
     as_dict = all_as_dict()
-    return as_dict['Running'] + as_dict['Stopped'] 
+    containers = as_dict['Running'] + as_dict['Frozen'] + as_dict['Stopped'] 
+    containers_list = []
+    for i in containers:
+        i = i.replace(' (auto)', '')
+        containers_list.append(i)
+    return containers_list
 
 
 def start(name, config_file=None):
@@ -233,7 +240,7 @@ def monitor(name, callback):
         signal.signal(signal.SIGTERM, kill_handler)
         signal.signal(signal.SIGINT, kill_handler)
     _monitor.add_monitor(name, callback)
-            
+
 
 def unmonitor(name):
     if not exists(name):
@@ -254,7 +261,7 @@ def stop_monitor():
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-        
+
 def freeze(name):
     '''
     freezes the container
@@ -295,7 +302,7 @@ def checkconfig():
     returns the output of lxc-checkconfig
     '''
     cmd = ['lxc-checkconfig']
-    return subprocess.check_output(cmd)
+    return subprocess.check_output(cmd).replace('[1;32m', '').replace('[1;33m', '').replace('[0;39m', '').replace('[1;32m', '').replace(' ', '').split('\n')
 
 
 def notify(name, states, callback):
